@@ -67,20 +67,34 @@ def getListClosest(pt,clients):
     closest = sorted_list.pop(0)
     return [closest.id] + getListClosest(closest.point,sorted_list)
 
-def random_routes(k,w,clients):
-    routes = [[0] for _ in range(k)]
-    weights = [0 for _ in range(k)]
-    for p in clients:
-        if p.id != 0:
-            classed = False
-            while not classed:
-                i = random.randint(0,k-1)
-                if weights[i] + p.demande <= w:
-                    routes[i].append(p.id)
-                    weights[i] += p.demande
-                    classed = True
-    for r in routes:
-        r.append(0)
+def greedy_routes(k,W,clients):
+    routes = []
+    for i in range(k):
+        routes.append([0])
+        w = W
+        j = 1
+        while w > 0 and j < len(clients):
+            if w - clients[j].demande >= 0:
+                w -= clients[j].demande
+                routes[-1].append(clients[j].id)
+                clients = clients[:j] + clients[j + 1:]
+            else:
+                j += 1
+        routes[-1].append(0)
+        
+    # routes = [[0] for _ in range(k)]
+    # weights = [0 for _ in range(k)]
+    # for p in clients:
+    #     if p.id != 0:
+    #         classed = False
+    #         while not classed:
+    #             i = random.randint(0,k-1)
+    #             if weights[i] + p.demande <= W:
+    #                 routes[i].append(p.id)
+    #                 weights[i] += p.demande
+    #                 classed = True
+    # for r in routes:
+    #     r.append(0)
     return routes
 
 
@@ -125,13 +139,12 @@ def generate_neighboorhood(routes):
 
     for i in range(len(routes)):
         for j in range(1,len(routes[i])-1):
-            new_routes = copy.deepcopy(routes)
-            id = new_routes[i].pop(j)
-            rand = random.randint(0,len(routes)-1)
-            while rand == i: rand = random.randint(0,len(routes)-1)
-            list.insert(new_routes[i],1,id)
-            neighbors.append(new_routes)
-    
+            for k in range(len(routes)):
+                if k != i:
+                    new_routes = copy.deepcopy(routes)
+                    id = new_routes[i].pop(j)
+                    list.insert(new_routes[k],1,id)
+                    neighbors.append(new_routes)
     return neighbors
 
 def validate_neighboorhood(neighbors,clients,w):
@@ -169,17 +182,17 @@ def solve_advance(n, k, W, points):
 
     # for c in clients:
     #     print(c)
-    initial_routes = random_routes(k,W,clients)
+    initial_routes = greedy_routes(k,W,clients)
 
     nb_iterations = 1000
-    T = 1
-    alphaT = 0.97
+    T = 100
+    alphaT = 0.9
     s = initial_routes
     fs = getCost(s,clients)
     star = s
     fstar = fs
 
-    iterations_for_2opt = 30
+    iterations_for_2opt = 20
     for k in range(nb_iterations):
         if k % 100 == 0: print(fstar)
         G = generate_neighboorhood(s)
@@ -198,6 +211,9 @@ def solve_advance(n, k, W, points):
             fstar = fs
             T = alphaT * T
 
-    # print(star)
-    print("--- %s seconds ---" % (time.time() - start_time))
+    print("before opt",fstar)
+    star = optimize_route(star,clients,100)
+    fstar = getCost(star,clients)
+    print("after opt",fstar)
+    print("--- %s seconds ---" % (time.time() - start_time).__round__())
     return fstar, star
