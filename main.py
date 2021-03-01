@@ -7,7 +7,11 @@ def parse_arguments():
     parser = argparse.ArgumentParser()
 
     # Instances parameters
-    parser.add_argument('--infile', type=str, default='instances/test')
+    # parser.add_argument('--infile', type=str, default='instances/test2')
+    # parser.add_argument('--infile', type=str, default='instances/instanceA')
+    parser.add_argument('--infile', type=str, default='instances/instanceB')
+    # parser.add_argument('--infile', type=str, default='instances/instanceC')
+    # parser.add_argument('--infile', type=str, default='instances/instanceD')
     parser.add_argument('--outfile', type=str, default='output')
     parser.add_argument('--visufile', type=str, default='sol.png')
 
@@ -26,8 +30,10 @@ if __name__ == '__main__':
 
     n, k, W, points = utils.read_instance(args.infile)
 
-    totValue, routes = solver.solve_naive(n, k, W, points)
-    # totValue, routes = solver.solve_advance(n, k, W, points)
+    # totValue, routes = solver.solve_naive(n, k, W, points)
+    totValue, routes = solver.solve_advance(n, k, W, points)
+
+    print(f"Total cost : {totValue}")
 
     utils.is_valid_solution(n, k, W, points, totValue, routes)
 
