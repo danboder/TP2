@@ -47,6 +47,8 @@ class Point():
         self.y = y
     def __str__(self):
         return "("+str(self.x)+","+str(self.y)+")"
+    def __eq__(self, other):
+        return self.x == other.x and self.y == other.y
     
     def distance(self,other):
         return math.dist((self.x,self.y),(other.x,other.y))
@@ -58,6 +60,53 @@ class Client():
 
     def __str__(self):
         return f"Id: {self.id}, demande: {self.demande}, Point: {str(self.point)}"
+
+def closestPoint(pt,point):
+    dist = 1e10
+    closest = None
+    for i,p in enumerate(point):
+        d = p.distance(pt)
+        if d < dist:
+            dist = d
+            closest = i
+    return closest
+
+
+
+def kMeans(k,W,clients):
+    centroids = []
+    for _ in range(k):
+        centroids.append(Point(random.random()*200 - 100, random.random()*200 - 100)) # create k random points in space (x and y between -100 and 100)
+    clients_belongs_to = [closestPoint(pt,centroids) for pt in map(lambda c: c.point, clients)]
+    iterations = 0
+    while iterations < 10:
+        sum_of_pos = [[0,0] for _ in range(k)]
+        nb_per_centroid = [0 for _ in range(k)]
+        for i in range(len(clients)):
+            index_belongingPoint = clients_belongs_to[i]
+            sum_of_pos[index_belongingPoint][0] += clients[i].point.x
+            sum_of_pos[index_belongingPoint][1] += clients[i].point.y
+            nb_per_centroid[index_belongingPoint] += 1
+        for i in range(k):
+            ni = nb_per_centroid[i]
+            si = sum_of_pos[i]
+            if ni != 0:
+                new_centroid = Point(si[0]/ni,si[1]/ni)
+            else:
+                new_centroid = Point(0,0)
+            if centroids[i] != new_centroid:
+                centroids[i] = new_centroid
+        clients_belongs_to = [closestPoint(pt,centroids) for pt in map(lambda c: c.point, clients)]
+        iterations += 1
+    
+    routes = [[0] for _ in range(k)]
+    for i,index_centroid in enumerate(clients_belongs_to):
+        if i != 0:
+            routes[index_centroid].append(clients[i].id)
+    for r in routes:
+        r.append(0)
+    return routes
+
 
 
 def getListClosest(pt,clients):
@@ -83,8 +132,6 @@ def greedy_routes(k,W,clients):
         routes[-1].append(0)
     return routes
 
-
-
 def getCost(routes,clients):
     cost = 0
     for r in routes:
@@ -93,7 +140,6 @@ def getCost(routes,clients):
             p2 = clients[r[i]].point
             cost += p1.distance(p2)
     return cost
-
 
 def two_opt(r,clients,nb_iterations):
     best = r
@@ -142,9 +188,10 @@ def optimize_route2(routes,clients,nb_iterations): # real 2 opt
         for _ in range(nb_iterations):
             for permut in permutations(range(len(route)),2): # try all permutations
                 new_route = copy.deepcopy(route)
-                save = new_route[permut[0]]
-                new_route[permut[0]] = new_route[permut[1]]
-                new_route[permut[1]] = save
+                to_switch = new_route[permut[0]:permut[1]+1]
+                l = permut[1]-permut[0]
+                for s in range(l):
+                    new_route[permut[0]+s] = to_switch[l-1-s]
                 new_route = [0] + new_route + [0]
                 new_cost = getCost([new_route],clients)
                 if new_cost < cost:
@@ -188,7 +235,9 @@ def validate_neighboorhood(neighbors,clients,w):
             sum = 0
             for c in r:
                 sum += clients[c].demande
-            if sum > w: list_to_remove.append(i)
+            if sum > w: 
+                list_to_remove.append(i)
+                break
     for i in range(len(list_to_remove)-1,-1,-1):
         neighbors.pop(list_to_remove[i])
     return neighbors
@@ -213,12 +262,19 @@ def solve_advance(n, k, W, points):
     clients = [Client(i,p[0],Point(*p[1],)) for i,p in enumerate(points)]
     # id = 0 is storage
 
+    V = []
+    while(len(V)==0):
+        star = kMeans(k,W,clients)
+        G = generate_neighboorhood(star)
+        V = validate_neighboorhood(G, clients, W)
+    s = V[random.randint(0,len(V)-1)]
+
+    # s = greedy_routes(k,W,clients)
 
     # nb_iterations = 1000
     T = 30
     alphaT = 0.9
 
-    s = greedy_routes(k,W,clients)
     fs = getCost(s,clients)
     star = s
     fstar = fs
@@ -226,7 +282,7 @@ def solve_advance(n, k, W, points):
     iterations_for_2opt = 5
     # for k in range(nb_iterations):
     k = 0
-    execution_time = 2 # in minutes
+    execution_time = 5 # in minutes
     change = True
     while time.time() - start_time < execution_time * 60:
         if change:
@@ -235,7 +291,7 @@ def solve_advance(n, k, W, points):
             V = validate_neighboorhood(G, clients, W)
             change = False
         c = V[random.randint(0,len(V)-1)]
-        c = optimize_route(c,clients,iterations_for_2opt)
+        c = optimize_route2(c,clients,iterations_for_2opt)
         fc = getCost(c,clients)
         delta = fc - fs
         if delta <= 0 or random.random() < math.exp(-delta/T):
@@ -250,7 +306,7 @@ def solve_advance(n, k, W, points):
         k += 1
 
     print("before opt",fstar)
-    star = optimize_route2(star,clients,20)
+    star = optimize_route2(star,clients,50)
     fstar = getCost(star,clients)
     print("after opt",fstar)
     print("--- %s seconds ---" % (time.time() - start_time).__round__())
