@@ -81,20 +81,6 @@ def greedy_routes(k,W,clients):
             else:
                 j += 1
         routes[-1].append(0)
-        
-    # routes = [[0] for _ in range(k)]
-    # weights = [0 for _ in range(k)]
-    # for p in clients:
-    #     if p.id != 0:
-    #         classed = False
-    #         while not classed:
-    #             i = random.randint(0,k-1)
-    #             if weights[i] + p.demande <= W:
-    #                 routes[i].append(p.id)
-    #                 weights[i] += p.demande
-    #                 classed = True
-    # for r in routes:
-    #     r.append(0)
     return routes
 
 
@@ -125,26 +111,74 @@ def two_opt(r,clients,nb_iterations):
                 cost = new_cost
     return best
 
-def optimize_route(routes,clients,nb_iterations):
+def optimize_route(routes,clients,nb_iterations): 
+    # 2 opt, but with some tweaks
     for i in range(len(routes)):
-        route = two_opt(routes[i],clients,nb_iterations)
-        routes[i] = route
+        r = routes[i]
+        best = r
+        cost = getCost([r],clients)
+        route = r[1:-1]
+        for _ in range(nb_iterations):
+            p = list(permutations(range(len(route)),2))
+            random.shuffle(p)
+            for permut in p:
+                save = route[permut[0]]
+                route[permut[0]] = route[permut[1]]
+                route[permut[1]] = save # we keep the 2opt for the next one
+                new_route = [0] + route + [0]
+                new_cost = getCost([new_route],clients)
+                if new_cost < cost:
+                    best = new_route
+                    cost = new_cost
+        routes[i] = best
+    return routes
+
+def optimize_route2(routes,clients,nb_iterations): # real 2 opt
+    for i in range(len(routes)):
+        r = routes[i]
+        best = r
+        cost = getCost([r],clients)
+        route = r[1:-1]
+        for _ in range(nb_iterations):
+            for permut in permutations(range(len(route)),2): # try all permutations
+                new_route = copy.deepcopy(route)
+                save = new_route[permut[0]]
+                new_route[permut[0]] = new_route[permut[1]]
+                new_route[permut[1]] = save
+                new_route = [0] + new_route + [0]
+                new_cost = getCost([new_route],clients)
+                if new_cost < cost:
+                    best = new_route
+                    route = best[1:-1]
+                    cost = new_cost
+            # edge cases : if we want to switch with the storage ==> we slide the whole list
+            for t in range(1,len(route)):
+                new_route = route[t:] + route[:t]
+                new_route = [0] + new_route + [0]
+                new_cost = getCost([new_route],clients)
+                if new_cost < cost:
+                    best = new_route
+                    route = best[1:-1]
+                    cost = new_cost
+        routes[i] = best
     return routes
 
 
 
 def generate_neighboorhood(routes):
-    # for each client, create a neighbor where the client is on another vehicle client list
+    # for each client
+    # we create a new neighbor where that client can be in any other vehicle client list
+    # at any position in the list
     neighbors = []
-
     for i in range(len(routes)):
-        for j in range(1,len(routes[i])-1):
-            for k in range(len(routes)):
-                if k != i:
-                    new_routes = copy.deepcopy(routes)
-                    id = new_routes[i].pop(j)
-                    list.insert(new_routes[k],1,id)
-                    neighbors.append(new_routes)
+        for j in range(1,len(routes[i])-1): # for each client
+            for k in range(len(routes)): # for each vehicle
+                if k != i: # we don't put the client in the same vehicle client list
+                    for insert_at in range(1,len(routes)-1): # at each place in the list
+                        new_routes = copy.deepcopy(routes)
+                        id = new_routes[i].pop(j) # remove the client from inial positon
+                        list.insert(new_routes[k],insert_at,id) # insert in new position
+                        neighbors.append(new_routes)
     return neighbors
 
 def validate_neighboorhood(neighbors,clients,w):
@@ -176,29 +210,30 @@ def solve_advance(n, k, W, points):
     # get time
     start_time = time.time()
 
-
     clients = [Client(i,p[0],Point(*p[1],)) for i,p in enumerate(points)]
     # id = 0 is storage
 
-    # for c in clients:
-    #     print(c)
-    initial_routes = greedy_routes(k,W,clients)
 
-    nb_iterations = 1000
-    T = 100
+    # nb_iterations = 1000
+    T = 30
     alphaT = 0.9
-    s = initial_routes
+
+    s = greedy_routes(k,W,clients)
     fs = getCost(s,clients)
     star = s
     fstar = fs
 
-    iterations_for_2opt = 20
-    for k in range(nb_iterations):
-        if k % 100 == 0: print(fstar)
-        G = generate_neighboorhood(s)
-        # print(G)
-        V = validate_neighboorhood(G, clients, W)
-        # print(V)
+    iterations_for_2opt = 5
+    # for k in range(nb_iterations):
+    k = 0
+    execution_time = 2 # in minutes
+    change = True
+    while time.time() - start_time < execution_time * 60:
+        if change:
+            # if we keep the same s, no use to redo generation and validation
+            G = generate_neighboorhood(s)
+            V = validate_neighboorhood(G, clients, W)
+            change = False
         c = V[random.randint(0,len(V)-1)]
         c = optimize_route(c,clients,iterations_for_2opt)
         fc = getCost(c,clients)
@@ -206,13 +241,16 @@ def solve_advance(n, k, W, points):
         if delta <= 0 or random.random() < math.exp(-delta/T):
             s = c
             fs = fc
-        if fs < fstar:
-            star = s
-            fstar = fs
-            T = alphaT * T
+            if fs < fstar:
+                star = s
+                fstar = fs
+                T = alphaT * T
+                print(str(k),fstar)
+            change = True
+        k += 1
 
     print("before opt",fstar)
-    star = optimize_route(star,clients,100)
+    star = optimize_route2(star,clients,20)
     fstar = getCost(star,clients)
     print("after opt",fstar)
     print("--- %s seconds ---" % (time.time() - start_time).__round__())

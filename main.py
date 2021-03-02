@@ -8,8 +8,8 @@ def parse_arguments():
 
     # Instances parameters
     # parser.add_argument('--infile', type=str, default='instances/test2')
-    # parser.add_argument('--infile', type=str, default='instances/instanceA')
-    parser.add_argument('--infile', type=str, default='instances/instanceB')
+    parser.add_argument('--infile', type=str, default='instances/instanceA')
+    # parser.add_argument('--infile', type=str, default='instances/instanceB')
     # parser.add_argument('--infile', type=str, default='instances/instanceC')
     # parser.add_argument('--infile', type=str, default='instances/instanceD')
     parser.add_argument('--outfile', type=str, default='output')
