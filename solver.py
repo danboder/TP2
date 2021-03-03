@@ -223,7 +223,7 @@ def generate_neighboorhood(routes):
                 if k != i: # we don't put the client in the same vehicle client list
                     for insert_at in range(1,len(routes)-1): # at each place in the list
                         new_routes = copy.deepcopy(routes)
-                        id = new_routes[i].pop(j) # remove the client from inial positon
+                        id = new_routes[i].pop(j) # remove the client from initial position
                         list.insert(new_routes[k],insert_at,id) # insert in new position
                         neighbors.append(new_routes)
     return neighbors
@@ -272,12 +272,16 @@ def solve_advance(n, k, W, points):
     # s = greedy_routes(k,W,clients)
 
     # nb_iterations = 1000
-    T = 30
+    T = 100
+    initT = T
     alphaT = 0.9
 
     fs = getCost(s,clients)
     star = s
     fstar = fs
+
+    re_count = 0
+    re_lim = 100
 
     iterations_for_2opt = 5
     # for k in range(nb_iterations):
@@ -286,9 +290,15 @@ def solve_advance(n, k, W, points):
     change = True
     while time.time() - start_time < execution_time * 60:
         if change:
-            # if we keep the same s, no use to redo generation and validation
-            G = generate_neighboorhood(s)
-            V = validate_neighboorhood(G, clients, W)
+            if re_count >= re_lim:
+                # if restart limit has be reached, we regenerate neighborhood on best solution and reset T
+                G = generate_neighboorhood(star)
+                V = validate_neighboorhood(G, clients, W)
+                T = initT
+            else:
+                # if we keep the same s, no use to redo generation and validation
+                G = generate_neighboorhood(s)
+                V = validate_neighboorhood(G, clients, W)
             change = False
         c = V[random.randint(0,len(V)-1)]
         c = optimize_route2(c,clients,iterations_for_2opt)
@@ -298,10 +308,15 @@ def solve_advance(n, k, W, points):
             s = c
             fs = fc
             if fs < fstar:
+                # if we improve the best sol'n, restart counter reset
+                re_count = 0
                 star = s
                 fstar = fs
                 T = alphaT * T
                 print(str(k),fstar)
+            if fs == fstar:
+                # count up to restart limit
+                re_count += 1
             change = True
         k += 1
 
