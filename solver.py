@@ -272,16 +272,16 @@ def solve_advance(n, k, W, points):
     # s = greedy_routes(k,W,clients)
 
     # nb_iterations = 1000
-    T = 100
-    initT = T
+    T = 30
     alphaT = 0.9
 
     fs = getCost(s,clients)
     star = s
     fstar = fs
+    fstar_prev = fstar
 
     re_count = 0
-    re_lim = 100
+    re_lim = 20
 
     iterations_for_2opt = 5
     # for k in range(nb_iterations):
@@ -294,7 +294,7 @@ def solve_advance(n, k, W, points):
                 # if restart limit has be reached, we regenerate neighborhood on best solution and reset T
                 G = generate_neighboorhood(star)
                 V = validate_neighboorhood(G, clients, W)
-                T = initT
+                re_count = 0
             else:
                 # if we keep the same s, no use to redo generation and validation
                 G = generate_neighboorhood(s)
@@ -308,16 +308,17 @@ def solve_advance(n, k, W, points):
             s = c
             fs = fc
             if fs < fstar:
-                # if we improve the best sol'n, restart counter reset
+                # if we improve the best sol'n, restart counter resets
                 re_count = 0
                 star = s
                 fstar = fs
                 T = alphaT * T
                 print(str(k),fstar)
-            if fs == fstar:
+            if fstar_prev == fstar:
                 # count up to restart limit
                 re_count += 1
             change = True
+        fstar_prev = fstar
         k += 1
 
     print("before opt",fstar)
