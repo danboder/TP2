@@ -264,7 +264,8 @@ def solve_advance(n, k, W, points):
 
     V = []
     while(len(V)==0):
-        star = kMeans(k,W,clients)
+        # star = kMeans(k,W,clients)
+        star = greedy_routes(k, W, clients)
         G = generate_neighboorhood(star)
         V = validate_neighboorhood(G, clients, W)
     s = V[random.randint(0,len(V)-1)]
@@ -272,8 +273,11 @@ def solve_advance(n, k, W, points):
     # s = greedy_routes(k,W,clients)
 
     # nb_iterations = 1000
-    T = 30
+    T = 40
+    # attenuating coefficient for temp
     alphaT = 0.9
+    # scaling coefficient for reinitializing temp
+    betaT = 100
 
     fs = getCost(s,clients)
     star = s
@@ -291,10 +295,12 @@ def solve_advance(n, k, W, points):
     while time.time() - start_time < execution_time * 60:
         if change:
             if re_count >= re_lim:
-                # if restart limit has be reached, we regenerate neighborhood on best solution and reset T
+                # if restart limit has be reached, we regenerate neighborhood on best solution
+                # Restart on previous best's neighborhood
                 G = generate_neighboorhood(star)
                 V = validate_neighboorhood(G, clients, W)
                 re_count = 0
+                T /= (betaT*random.randint(2, 5)*alphaT)
             else:
                 # if we keep the same s, no use to redo generation and validation
                 G = generate_neighboorhood(s)
