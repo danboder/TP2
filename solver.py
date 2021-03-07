@@ -344,7 +344,6 @@ def solve_advance(n, k, W, points):
     # TODO implement here your solution
     # get time
     start_time = time.time()
-    print("hey")
 
     clients = [Client(i,p[0],Point(*p[1],)) for i,p in enumerate(points)]
     # id = 0 is storage
@@ -370,7 +369,6 @@ def solve_advance(n, k, W, points):
 
     iterations_for_2opt = 10
     k = 0
-    print("heyr")
     execution_time = 2 # in minutes
     change = True
     while time.time() - start_time < execution_time * 60:
@@ -402,97 +400,6 @@ def solve_advance(n, k, W, points):
                 fstar = fs
                 T = alphaT * T
                 print(k,fstar)
-            if fstar_prev == fstar:
-                # count up to restart limit
-                re_count += 1
-            change = True
-        fstar_prev = fstar
-        k += 1
-
-    print("before opt",fstar)
-    star = optimize_route2(star,clients,50)
-    fstar = getCost(star,clients)
-    print("after opt",fstar)
-    print("--- %s seconds ---" % (time.time() - start_time).__round__())
-    return fstar, star
-
-
-def solve_advance(n, k, W, points):
-    """
-    Advanced solution of the problem
-    :param n: total number of point (storage included) (int)
-    :param k: total number of vehicule (int)
-    :param W: max weight available by vehicle (int)
-    :param points: list of all the descriptions of the
-                        points (demand d_i (int), coordinate (x_i,y_i) (tuple of floats)) (list of tuples (d_i, (x_i,y_i)))
-    :return: a tuple (totValue, routes) where totValue is the cost value of the solution (float) and
-             routes is a list of list of int describing the routes of the vehicules
-    """
-    # TODO implement here your solution
-    # get time
-    start_time = time.time()
-
-    clients = [Client(i,p[0],Point(*p[1],)) for i,p in enumerate(points)]
-    # id = 0 is storage
-
-    V = []
-    while(len(V)==0):
-        # star = kMeans(k,W,clients)
-        star = greedy_routes(k, W, clients)
-        G = generate_neighboorhood(star)
-        V = validate_neighboorhood(G, clients, W)
-    s = V[random.randint(0,len(V)-1)]
-
-    # s = greedy_routes(k,W,clients)
-
-    # nb_iterations = 1000
-    T = 40
-    # attenuating coefficient for temp
-    alphaT = 0.9
-    # scaling coefficient for reinitializing temp
-    betaT = 100
-
-    fs = getCost(s,clients)
-    star = s
-    fstar = fs
-    fstar_prev = fstar
-
-    re_count = 0
-    re_lim = 20
-
-    iterations_for_2opt = 5
-    # for k in range(nb_iterations):
-    k = 0
-    execution_time = 5 # in minutes
-    change = True
-    while time.time() - start_time < execution_time * 60:
-        if change:
-            if re_count >= re_lim:
-                # if restart limit has be reached, we regenerate neighborhood on best solution
-                # Restart on previous best's neighborhood
-                G = generate_neighboorhood(star)
-                V = validate_neighboorhood(G, clients, W)
-                re_count = 0
-                T /= (betaT*random.randint(2, 5)*alphaT)
-            else:
-                # if we keep the same s, no use to redo generation and validation
-                G = generate_neighboorhood(s)
-                V = validate_neighboorhood(G, clients, W)
-            change = False
-        c = V[random.randint(0,len(V)-1)]
-        c = optimize_route2(c,clients,iterations_for_2opt)
-        fc = getCost(c,clients)
-        delta = fc - fs
-        if delta <= 0 or random.random() < math.exp(-delta/T):
-            s = c
-            fs = fc
-            if fs < fstar:
-                # if we improve the best sol'n, restart counter resets
-                re_count = 0
-                star = s
-                fstar = fs
-                T = alphaT * T
-                print(str(k),fstar)
             if fstar_prev == fstar:
                 # count up to restart limit
                 re_count += 1
