@@ -89,7 +89,8 @@ def draw_solution(filename, points, routes, totValue):
         plt.plot(x, y, "co", color="m")
         plt.text(x, y, "L%d" % id, color="b", fontsize=8)
 
-    cycle_color = ["b", "g", "r", "c", "m", "y", "k", "w"]
+    # cycle_color = ["b", "g", "r", "c", "m", "y", "k", "w"]
+    cycle_color = ["b", "g", "r", "c", "m", "y", "k", "grey"]
     for route_id in range(len(routes)):
         route = routes[route_id]
         route_color = cycle_color[route_id % len(cycle_color)]
