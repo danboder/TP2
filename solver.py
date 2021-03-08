@@ -155,7 +155,8 @@ def kMeans(k,W,clients):
         for r in routes:
             r.append(0)
 
-        if areRoutesValid(routes,W,clients): return routes
+        if areRoutesValid(routes,W,clients): 
+            return routes
 
 
     # if routes not valid compared to total capacity of vehicles
@@ -199,6 +200,8 @@ def kMeans(k,W,clients):
                 # print(centroids_available_copy)
                 # get the closest centroid_available from the client
                 index_centroid_available = closestPoint(point_client,centroids_available_copy)
+                if index_centroid_available == None:
+                    return False
                 closest = centroids_available_copy[index_centroid_available]
                 # print("closest",closest)
 
@@ -219,30 +222,8 @@ def kMeans(k,W,clients):
 
     return routes
 
-
 def optimize_route(routes,clients,nb_iterations): 
-    # 2 opt, but with some tweaks
-    for i in range(len(routes)):
-        r = routes[i]
-        best = r
-        cost = getCost([r],clients)
-        route = r[1:-1]
-        for _ in range(nb_iterations):
-            p = list(permutations(range(len(route)),2))
-            random.shuffle(p)
-            for permut in p:
-                save = route[permut[0]]
-                route[permut[0]] = route[permut[1]]
-                route[permut[1]] = save # we keep the 2opt for the next one
-                new_route = [0] + route + [0]
-                new_cost = getCost([new_route],clients)
-                if new_cost < cost:
-                    best = new_route
-                    cost = new_cost
-        routes[i] = best
-    return routes
-
-def optimize_route2(routes,clients,nb_iterations): # real 2 opt
+    # 2 opt
     for i in range(len(routes)):
         r = routes[i]
         best = r
@@ -294,20 +275,26 @@ def generate_neighboorhood(routes):
                         neighbors.append(new_routes)
     return neighbors
 
-def generate_neighboorhood2(routes):
-    # for each client
-    # we create a new neighbor where that client can be in any other vehicle client list
-    # at any position in the list
+def generate_neighboorhood_faster(routes,W,clients):
+    # for each client we create a new neighbor where that client can be in any other vehicle (taken at random) at a random position
+    # as we don't create a neighbor for each case, this function is faster than the previous one
+    # also we validate the neighbor before adding it, so no need to call validate neighborhood after
     neighbors = []
     for i in range(len(routes)):
         for j in range(1,len(routes[i])-1): # for each client
-            for k in range(len(routes)): # for each vehicle
-                if k != i: # we don't put the client in the same vehicle client list
-                    insert_at = random.randint(1,len(routes)-2)
-                    new_routes = copy.deepcopy(routes)
-                    id = new_routes[i].pop(j) # remove the client from inial positon
-                    list.insert(new_routes[k],insert_at,id) # insert in new position
-                    neighbors.append(new_routes)
+            insert_in = [var_ for var_ in range(len(routes))]
+            insert_in.pop(i)
+            k = random.choice(insert_in) # random route to insert client
+            # sum = 0
+            # r = routes[k]
+            # for c in r:
+            #     sum += clients[c].demande
+            # if sum + clients[routes[i][j]].demande <= W and r[0] == 0 and r[-1] == 0:
+            insert_at = random.randint(1,len(routes)-2)
+            new_routes = copy.deepcopy(routes)
+            id = new_routes[i].pop(j) # remove the client from inial positon
+            list.insert(new_routes[k],insert_at,id) # insert in new position random
+            neighbors.append(new_routes)
     return neighbors
 
 
@@ -342,74 +329,89 @@ def solve_advance(n, k, W, points):
              routes is a list of list of int describing the routes of the vehicules
     """
     # TODO implement here your solution
-    # get time
-    start_time = time.time()
+
+    total_time = time.time()
 
     clients = [Client(i,p[0],Point(*p[1],)) for i,p in enumerate(points)]
     # id = 0 is storage
 
-    s = kMeans(k,W,clients)
-    s = optimize_route2(s,clients,50)
-    # s = greedy_routes(k,W,clients)
+    best_s = None
+    best_f = 1e10
 
-    # nb_iterations = 1000
-    T = 1
-    alphaT = 0.9
-    # scaling coefficient for reinitializing temp
-    betaT = 100
-
-    fs = getCost(s,clients)
-    star = s
-    fstar = fs
-    fstar_prev = fstar
-
-    re_count = 0
-    re_lim = 20
+    nb_restart = 30
+    for _ in range(nb_restart):
+        print("START")
+        # get time
+        start_time = time.time()
 
 
-    iterations_for_2opt = 10
-    k = 0
-    execution_time = 2 # in minutes
-    change = True
-    while time.time() - start_time < execution_time * 60:
-        if k % 500 == 0: 
-            print(k,fs)
-        if change:
+        s = kMeans(k,W,clients)
+        while s == False:
+            s = kMeans(k,W,clients)
+        # s = greedy_routes(k,W,clients)
+        s = optimize_route(s,clients,15)
+
+        T = 5
+        maxT = T
+        alphaT = 0.97
+        betaT = 2 # scaling coefficient for reheating
+
+        fs = getCost(s,clients)
+        star = s
+        fstar = fs
+
+        re_count = 0
+        re_lim = 30
+
+        iterations_for_2opt = 1
+        i = 0
+        execution_time = 10 / nb_restart # in minutes
+        # execution_time = 0.5 # in minutes
+        change = True
+        while time.time() - start_time < execution_time * 60:
+            # if i % 500 == 0: print(i,fs)
             if re_count >= re_lim:
                 # if restart limit has be reached, we regenerate neighborhood on best solution
                 # Restart on previous best's neighborhood
-                G = generate_neighboorhood(star)
+                # G = generate_neighboorhood(star)
                 re_count = 0 # reset counter
-                T *= betaT # "reheat the algorithm" = increase T
-            else:
+                T = min(T + betaT, maxT) # "reheat the algorithm" = increase T, but shouldn't go too hot
+                print(T)
+            if change:
                 # if we keep the same s, no use to redo generation and validation
+                # G = generate_neighboorhood_faster(s,W,clients)
                 G = generate_neighboorhood(s)
-            V = validate_neighboorhood(G, clients, W)
-            change = False
-        c = V[random.randint(0,len(V)-1)]
-        c = optimize_route(c,clients,iterations_for_2opt)
-        fc = getCost(c,clients)
-        delta = fc - fs
-        if delta <= 0 or random.random() < math.exp(-delta/T):
-            s = c
-            fs = fc
-            if fs < fstar:
-                # if we improve the best sol'n, restart counter resets
-                re_count = 0
-                star = s
-                fstar = fs
-                T = alphaT * T
-                print(k,fstar)
-            if fstar_prev == fstar:
+                V = validate_neighboorhood(G, clients, W)
+                change = False
+            c = V[random.randint(0,len(V)-1)]
+            c = optimize_route(c,clients,iterations_for_2opt)
+            fc = getCost(c,clients)
+            delta = fc - fs
+            if delta <= 0 or random.random() < math.exp(-delta/T):
+                change = True
+                s = c
+                fs = fc
+                if fs < fstar:
+                    # if we improve the best solution, restart counter resets
+                    re_count = 0
+                    star = s
+                    fstar = fs
+                    print(i,fstar,T)
+            else:
                 # count up to restart limit
                 re_count += 1
-            change = True
-        fstar_prev = fstar
-        k += 1
+            T = alphaT * T
+            i += 1
 
-    print("before opt",fstar)
-    star = optimize_route2(star,clients,50)
-    fstar = getCost(star,clients)
-    print("after opt",fstar)
-    print("--- %s seconds ---" % (time.time() - start_time).__round__())
-    return fstar, star
+        star = optimize_route(star,clients,2) # last optimization
+        fstar = getCost(star,clients)
+        if fstar < best_f:
+            print("NEW BEST",fstar)
+            best_f = fstar
+            best_s = star
+
+        print("--- %s seconds ---" % (time.time() - start_time).__round__())
+
+    print("--- Total Time %s seconds ---" % (time.time() - total_time).__round__())
+
+    return best_f, best_s
