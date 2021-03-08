@@ -307,7 +307,7 @@ def solve_advance(n, k, W, points):
                 V = validate_neighboorhood(G, clients, W)
             change = False
         c = V[random.randint(0,len(V)-1)]
-        # c = optimize_route2(c,clients,iterations_for_2opt)
+        c = optimize_route2(c,clients,iterations_for_2opt)
         fc = getCost(c,clients)
         delta = fc - fs
         if delta <= 0 or random.random() < math.exp(-delta/T):
@@ -328,7 +328,7 @@ def solve_advance(n, k, W, points):
         k += 1
 
     print("before opt",fstar)
-    # star = optimize_route2(star,clients,50)
+    star = optimize_route2(star,clients,50)
     fstar = getCost(star,clients)
     print("after opt",fstar)
     print("--- %s seconds ---" % (time.time() - start_time).__round__())
