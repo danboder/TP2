@@ -223,7 +223,7 @@ def generate_neighboorhood(routes):
                 if k != i: # we don't put the client in the same vehicle client list
                     for insert_at in range(1,len(routes)-1): # at each place in the list
                         new_routes = copy.deepcopy(routes)
-                        id = new_routes[i].pop(j) # remove the client from initial position
+                        id = new_routes[i].pop(j) # remove the client from inial positon
                         list.insert(new_routes[k],insert_at,id) # insert in new position
                         neighbors.append(new_routes)
     return neighbors
@@ -232,6 +232,9 @@ def validate_neighboorhood(neighbors,clients,w):
     list_to_remove = []
     for i,neighbor in enumerate(neighbors):
         for r in neighbor:
+            if r[0] != 0 or r[-1] != 0:
+                list_to_remove.append(i)
+                break
             sum = 0
             for c in r:
                 sum += clients[c].demande
@@ -287,10 +290,10 @@ def solve_advance(n, k, W, points):
     re_count = 0
     re_lim = 20
 
-    iterations_for_2opt = 5
+    iterations_for_2opt = 1
     # for k in range(nb_iterations):
     k = 0
-    execution_time = 5 # in minutes
+    execution_time = 1 # in minutes
     change = True
     while time.time() - start_time < execution_time * 60:
         if change:
