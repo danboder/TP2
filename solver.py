@@ -223,7 +223,7 @@ def kMeans(k,W,clients):
     return routes
 
 def optimize_route(routes,clients,nb_iterations): 
-    # 2 opt
+    # choosing the best 2-Opt for nb_iterations
     for i in range(len(routes)):
         r = routes[i]
         best = r
@@ -235,18 +235,15 @@ def optimize_route(routes,clients,nb_iterations):
                 # change the order between the 2 points
                 to_switch = new_route[permut[0]:permut[1]+1] # = change the order of to_switch
                 to_switch.reverse()
-                # l = permut[1]-permut[0]
-                # for s in range(l):
-                #     new_route[permut[0]+s] = to_switch[l-1-s]
                 new_route = new_route[:permut[0]] + to_switch + new_route[permut[1] + 1:]
                 new_route = [0] + new_route + [0]
                 new_cost = getCost([new_route],clients)
-                if new_cost < cost:
+                if new_cost < cost: # we save the best 2-Opt
                     best = new_route
                     route = best[1:-1]
                     cost = new_cost
             # edge cases : if we want to switch with the storage ==> we slide the whole list
-            for t in range(1,len(route)):
+            for t in range(1,len(route)): # we save the best 2-Opt
                 new_route = route[t:] + route[:t]
                 new_route = [0] + new_route + [0]
                 new_cost = getCost([new_route],clients)
@@ -328,40 +325,47 @@ def solve_advance(n, k, W, points):
     :return: a tuple (totValue, routes) where totValue is the cost value of the solution (float) and
              routes is a list of list of int describing the routes of the vehicules
     """
-    # TODO implement here your solution
-
-    total_time = time.time()
-
-    clients = [Client(i,p[0],Point(*p[1],)) for i,p in enumerate(points)]
-    # id = 0 is storage
+    total_time = time.time() # get time, algorithm can run during 10 minutes
+    clients = [Client(i,p[0],Point(*p[1],)) for i,p in enumerate(points)] # id = 0 is storage
 
     best_s = None
     best_f = 1e10
 
-    nb_restart = 30
+    #########################################
+    # HYPER PARAMETERS
+    nb_restart = 20
+    T = 3
+    maxT = T
+    alphaT = 0.92
+    betaT = 1
+    faster_neighborhood = True
+    #########################################
+
+
     for _ in range(nb_restart):
         print("START")
-        # get time
-        start_time = time.time()
+        start_time = time.time() # get time
 
-
-        s = kMeans(k,W,clients)
-        while s == False:
+        best_start = None
+        best_start_score = 1e10
+        for _ in range(10):
             s = kMeans(k,W,clients)
-        # s = greedy_routes(k,W,clients)
-        s = optimize_route(s,clients,15)
+            while s == False:
+                s = kMeans(k,W,clients)
+            # s = greedy_routes(k,W,clients)
+            s = optimize_route(s,clients,5)
+            cost = getCost(s,clients)
+            if cost < best_start_score:
+                best_start_score = cost
+                best_start = s
 
-        T = 5
-        maxT = T
-        alphaT = 0.97
-        betaT = 2 # scaling coefficient for reheating
-
-        fs = getCost(s,clients)
+        s = best_start
+        fs = best_start_score
         star = s
         fstar = fs
 
         re_count = 0
-        re_lim = 30
+        re_lim = 20
 
         iterations_for_2opt = 1
         i = 0
@@ -369,18 +373,17 @@ def solve_advance(n, k, W, points):
         # execution_time = 0.5 # in minutes
         change = True
         while time.time() - start_time < execution_time * 60:
-            # if i % 500 == 0: print(i,fs)
             if re_count >= re_lim:
                 # if restart limit has be reached, we regenerate neighborhood on best solution
                 # Restart on previous best's neighborhood
-                # G = generate_neighboorhood(star)
+                G = generate_neighboorhood_faster(star,W,clients) if faster_neighborhood else generate_neighboorhood(star)
+                V = validate_neighboorhood(G, clients, W)
                 re_count = 0 # reset counter
                 T = min(T + betaT, maxT) # "reheat the algorithm" = increase T, but shouldn't go too hot
                 print(T)
             if change:
                 # if we keep the same s, no use to redo generation and validation
-                # G = generate_neighboorhood_faster(s,W,clients)
-                G = generate_neighboorhood(s)
+                G = generate_neighboorhood_faster(s,W,clients) if faster_neighborhood else generate_neighboorhood(s)
                 V = validate_neighboorhood(G, clients, W)
                 change = False
             c = V[random.randint(0,len(V)-1)]
