@@ -124,15 +124,18 @@ def greedy_routes(k,W,clients):
     return routes
 
 def kMeans(k,W,clients):
-
-    nb_tries_before_balancing = 50
+    # get initial solution based on the kmeans algorithm
+    nb_tries_before_balancing = 20 # as the initialisation is random for centroids, we try multiple times
     for _ in range(nb_tries_before_balancing):
         centroids = []
         for _ in range(k):
-            centroids.append(Point(random.random()*200 - 100, random.random()*200 - 100)) # create k random points in space (x and y between -100 and 100)
+            centroids.append(Point(random.random()*200 - 100, random.random()*200 - 100)) 
+            # create k random points in space (x and y between -100 and 100)
+        # assign each client to a cluster
         clients_belongs_to = [closestPoint(pt,centroids) for pt in map(lambda c: c.point, clients)]
         iterations = 0
-        while iterations < 30:
+        while iterations < 20: # update centroids for 20 iterations (no need of convergence)
+            # classic K-means algorithm
             sum_of_pos = [[0,0] for _ in range(k)]
             nb_per_centroid = [0 for _ in range(k)]
             for i in range(len(clients)):
@@ -144,10 +147,12 @@ def kMeans(k,W,clients):
                 ni = nb_per_centroid[i]
                 si = sum_of_pos[i]
                 if ni != 0:
-                    centroids[i] = Point(si[0]/ni,si[1]/ni)
+                    centroids[i] = Point(si[0]/ni,si[1]/ni) # update centroid
+            # update the client to cluster assignation
             clients_belongs_to = [closestPoint(pt,centroids) for pt in map(lambda c: c.point, clients)]
             iterations += 1
         
+        # transform the cluster in routes
         routes = [[0] for _ in range(k)]
         for i,index_centroid in enumerate(clients_belongs_to):
             if i != 0:
@@ -155,7 +160,7 @@ def kMeans(k,W,clients):
         for r in routes:
             r.append(0)
 
-        if areRoutesValid(routes,W,clients): 
+        if areRoutesValid(routes,W,clients): # check if we're good with the demand
             return routes
 
 
@@ -172,7 +177,6 @@ def kMeans(k,W,clients):
         if diff > 0:
             index_place_left.append(i)
 
-    # print(centroids)
     # get centroids of clusters having space left
     centroids_available = []
     for i in index_place_left:
@@ -190,25 +194,17 @@ def kMeans(k,W,clients):
             # insert into the closest cluster ( = route ) with space
             inserted = False
             point_client = clients[c].point
-            # print(list(map(lambda r: list(map(lambda c: clients[c].demande,r)),routes)))
-            # print(point_client)
-            # print("DEMANDE",d)
-            # print(place_left)
             centroids_available_copy = copy.deepcopy(centroids_available)
 
             while not inserted:
-                # print(centroids_available_copy)
                 # get the closest centroid_available from the client
                 index_centroid_available = closestPoint(point_client,centroids_available_copy)
-                if index_centroid_available == None:
+                if index_centroid_available == None: # no solution
                     return False
                 closest = centroids_available_copy[index_centroid_available]
-                # print("closest",closest)
 
-                # index = random.randint(0,len(index_place_left)-1) # insert in another route (than has weight < W) by random
                 # find the route related to that centroid
                 index = centroids.index(closest)
-                # print("index",index)
                 if place_left[index] - d >= 0: # if it doesn't go above W
                     list.insert(routes[index],1,c) # insert in route
                     inserted = True
@@ -219,7 +215,6 @@ def kMeans(k,W,clients):
                 else:
                     # if it goes above total capacity W, remove that centroid from the ones in available_copy
                     centroids_available_copy.pop(index_centroid_available)
-
     return routes
 
 def optimize_route(routes,clients,nb_iterations): 
@@ -282,11 +277,6 @@ def generate_neighboorhood_faster(routes,W,clients):
             insert_in = [var_ for var_ in range(len(routes))]
             insert_in.pop(i)
             k = random.choice(insert_in) # random route to insert client
-            # sum = 0
-            # r = routes[k]
-            # for c in r:
-            #     sum += clients[c].demande
-            # if sum + clients[routes[i][j]].demande <= W and r[0] == 0 and r[-1] == 0:
             insert_at = random.randint(1,len(routes)-2)
             new_routes = copy.deepcopy(routes)
             id = new_routes[i].pop(j) # remove the client from inial positon
@@ -299,13 +289,14 @@ def validate_neighboorhood(neighbors,clients,w):
     list_to_remove = []
     for i,neighbor in enumerate(neighbors):
         for r in neighbor:
+            # check if we start and finish with 0 ( = storage)
             if r[0] != 0 or r[-1] != 0:
                 list_to_remove.append(i)
                 break
             sum = 0
             for c in r:
                 sum += clients[c].demande
-            if sum > w: 
+            if sum > w:  # check total demand is less than capacity
                 list_to_remove.append(i)
                 break
     for i in range(len(list_to_remove)-1,-1,-1):
@@ -335,24 +326,24 @@ def solve_advance(n, k, W, points):
     # HYPER PARAMETERS
     nb_restart = 20
     T = 3
-    maxT = T
     alphaT = 0.92
     betaT = 1
+    re_lim = 20
     faster_neighborhood = True
     #########################################
 
 
     for _ in range(nb_restart):
-        print("START")
         start_time = time.time() # get time
 
         best_start = None
         best_start_score = 1e10
+
+        # get the best initial solution possible on 10 tries
         for _ in range(10):
             s = kMeans(k,W,clients)
             while s == False:
                 s = kMeans(k,W,clients)
-            # s = greedy_routes(k,W,clients)
             s = optimize_route(s,clients,5)
             cost = getCost(s,clients)
             if cost < best_start_score:
@@ -365,10 +356,10 @@ def solve_advance(n, k, W, points):
         fstar = fs
 
         re_count = 0
-        re_lim = 20
+        maxT = T
 
         iterations_for_2opt = 1
-        i = 0
+        i = 0 # loop iteration counter
         execution_time = 10 / nb_restart # in minutes
         # execution_time = 0.5 # in minutes
         change = True
@@ -380,7 +371,6 @@ def solve_advance(n, k, W, points):
                 V = validate_neighboorhood(G, clients, W)
                 re_count = 0 # reset counter
                 T = min(T + betaT, maxT) # "reheat the algorithm" = increase T, but shouldn't go too hot
-                print(T)
             if change:
                 # if we keep the same s, no use to redo generation and validation
                 G = generate_neighboorhood_faster(s,W,clients) if faster_neighborhood else generate_neighboorhood(s)
@@ -399,9 +389,9 @@ def solve_advance(n, k, W, points):
                     re_count = 0
                     star = s
                     fstar = fs
-                    print(i,fstar,T)
+                    print("improvement at",i,":",fstar)
             else:
-                # count up to restart limit
+                # count up to restart limit if no increase
                 re_count += 1
             T = alphaT * T
             i += 1
